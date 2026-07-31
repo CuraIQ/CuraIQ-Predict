@@ -1,0 +1,114 @@
+from datetime import datetime, timezone
+from uuid import UUID
+from fastapi import APIRouter, Depends, Query
+
+from app.dependencies import PaginationParams
+from app.exceptions import NotFoundException, ConflictException
+from app.in_memory_db import db
+from app.schemas.common import PaginatedResponse, PaginationMeta, EnvelopeResponse
+from app.schemas.prediction import (
+    PredictionOut,
+    PredictionActionRequest,
+    PredictionActionResponse,
+    PredictionAction,
+)
+
+router = APIRouter(prefix="/predictions", tags=["Predictions"])
+
+def _risk_level(score: float) -> str:
+    if score >= 0.9: return "critical"
+    if score >= 0.7: return "high"
+    if score >= 0.4: return "medium"
+    return "low"
+
+_RISK_RANGES: dict[str, tuple[float, float]] = {
+    "critical": (0.9, 1.01),
+    "high": (0.7, 0.9),
+    "medium": (0.4, 0.7),
+    "low": (0.0, 0.4),
+}
+
+@router.get("/active", response_model=PaginatedResponse[PredictionOut])
+async def list_active_predictions(
+    pagination: PaginationParams = Depends(),
+    risk_level: str | None = Query(None, description="Filter: critical, high, medium, low"),
+    prediction_type: str | None = Query(None, description="Filter by prediction_type enum value"),
+    ward_id: UUID | None = Query(None, description="Filter by ward UUID"),
+):
+    active_preds = [p for p in db["predictions"] if p["status"] == "active"]
+
+    if risk_level and risk_level in _RISK_RANGES:
+        lo, hi = _RISK_RANGES[risk_level]
+        active_preds = [p for p in active_preds if lo <= p["risk_score"] < hi]
+    if prediction_type:
+        active_preds = [p for p in active_preds if p["prediction_type"] == prediction_type]
+    if ward_id:
+        active_preds = [p for p in active_preds if p.get("ward_id") == str(ward_id)]
+
+    active_preds.sort(key=lambda p: (p["risk_score"], p["created_at"]), reverse=True)
+
+    total = len(active_preds)
+    start = pagination.offset
+    end = start + pagination.page_size
+    page_items = active_preds[start:end]
+
+    items = [
+        PredictionOut(
+            id=UUID(p["id"]),
+            prediction_type=p["prediction_type"],
+            ward_id=UUID(p["ward_id"]) if p.get("ward_id") else None,
+            item_id=UUID(p["item_id"]) if p.get("item_id") else None,
+            risk_score=p["risk_score"],
+            risk_level=_risk_level(p["risk_score"]),
+            forecasted_event=p["forecasted_event"],
+            target_timestamp=datetime.fromisoformat(p["target_timestamp"]) if p.get("target_timestamp") else None,
+            recommended_action=p["recommended_action"],
+            status=p["status"],
+            created_at=datetime.fromisoformat(p["created_at"]),
+        )
+        for p in page_items
+    ]
+
+    total_pages = max(1, -(-total // pagination.page_size))
+    return PaginatedResponse(
+        data=items,
+        meta=PaginationMeta(
+            page=pagination.page,
+            page_size=pagination.page_size,
+            total=total,
+            total_pages=total_pages,
+        ),
+    )
+
+@router.post("/{prediction_id}/action", response_model=EnvelopeResponse[PredictionActionResponse])
+async def act_on_prediction(
+    prediction_id: UUID,
+    body: PredictionActionRequest,
+):
+    pred = next((p for p in db["predictions"] if p["id"] == str(prediction_id)), None)
+    if not pred:
+        raise NotFoundException(detail=f"Prediction {prediction_id} not found")
+
+    if pred["status"] != "active":
+        raise ConflictException(
+            detail=f"Prediction is already '{pred['status']}' and cannot be actioned",
+            error_code="PREDICTION_NOT_ACTIONABLE",
+        )
+
+    status_map = {
+        PredictionAction.ACCEPT: "accepted",
+        PredictionAction.DISMISS: "dismissed",
+        PredictionAction.OVERRIDE: "overridden",
+    }
+    pred["status"] = status_map[body.action]
+    pred["action_notes"] = body.notes
+    pred["actioned_at"] = datetime.now(timezone.utc).isoformat()
+
+    return EnvelopeResponse(
+        data=PredictionActionResponse(
+            id=UUID(pred["id"]),
+            status=pred["status"],
+            action_notes=pred["action_notes"],
+            actioned_at=datetime.fromisoformat(pred["actioned_at"]),
+        )
+    )

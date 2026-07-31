@@ -1,49 +1,51 @@
-import { useState, useCallback } from 'react';
-import { PredictIQQueryProvider } from './providers/QueryProvider';
-import { Dashboard } from './components/Dashboard';
-import { AlertToast } from './components/AlertToast';
-import { usePredictiveAlerts } from './hooks/usePredictiveAlerts';
-import type { WsAlertPayload } from './api/types';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 
-function AlertToasts() {
-  const [toasts, setToasts] = useState<WsAlertPayload[]>([]);
+// Layouts
+import { PublicLayout } from './layouts/PublicLayout';
+import { StaffLayout } from './layouts/StaffLayout';
 
-  const handleAlert = useCallback((alert: WsAlertPayload) => {
-    setToasts((prev) => [alert, ...prev].slice(0, 5));
-  }, []);
+// Pages
+import { PatientView } from './pages/PatientView';
+import { LoginPage } from './pages/LoginPage';
+import { StaffDashboard } from './pages/StaffDashboard';
+import { WardsIntelligence } from './pages/WardsIntelligence';
+import { AnalyticsDashboard } from './pages/AnalyticsDashboard';
 
-  const dismissToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  }, []);
-
-  usePredictiveAlerts({ onAlert: handleAlert });
-
-  if (toasts.length === 0) return null;
-
-  return (
-    <div
-      style={{
-        position: 'fixed',
-        top: '1rem',
-        right: '1rem',
-        zIndex: 9999,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0.75rem',
-      }}
-    >
-      {toasts.map((alert) => (
-        <AlertToast key={alert.id} alert={alert} onDismiss={dismissToast} />
-      ))}
-    </div>
-  );
-}
+// Protection
+import { ProtectedRoute } from './components/ProtectedRoute';
 
 export function App() {
   return (
-    <PredictIQQueryProvider>
-      <Dashboard />
-      <AlertToasts />
-    </PredictIQQueryProvider>
+    <HashRouter>
+      <Routes>
+        {/* Public Guest Routes */}
+        <Route path="/" element={<PublicLayout />}>
+          <Route index element={<PatientView />} />
+        </Route>
+
+        {/* Staff Authentication */}
+        <Route path="/login" element={<PublicLayout />}>
+          <Route index element={<LoginPage />} />
+        </Route>
+
+        {/* Protected Staff Control Routes */}
+        <Route
+          path="/staff"
+          element={
+            <ProtectedRoute>
+              <StaffLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Navigate to="/staff/dashboard" replace />} />
+          <Route path="dashboard" element={<StaffDashboard />} />
+          <Route path="wards" element={<WardsIntelligence />} />
+          <Route path="analytics" element={<AnalyticsDashboard />} />
+        </Route>
+
+        {/* Catch-all Fallback */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </HashRouter>
   );
 }

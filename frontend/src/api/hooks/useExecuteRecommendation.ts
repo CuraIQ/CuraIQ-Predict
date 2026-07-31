@@ -43,7 +43,7 @@ export function useExecuteRecommendation() {
     },
 
     // ── Optimistic update ──────────────────────────────────────────
-    onMutate: async ({ predictionId, payload }) => {
+    onMutate: async ({ predictionId }) => {
       // Cancel any outgoing refetches so they don't overwrite our optimistic update
       await queryClient.cancelQueries({ queryKey: PREDICTIONS_QUERY_KEY });
 
