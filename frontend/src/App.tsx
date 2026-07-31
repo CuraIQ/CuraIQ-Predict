@@ -20,15 +20,13 @@ export function App() {
   return (
     <HashRouter>
       <Routes>
-        {/* Public Guest Routes */}
+        {/* Public Guest Routes (light header, footer) */}
         <Route path="/" element={<PublicLayout />}>
           <Route index element={<PatientView />} />
         </Route>
 
-        {/* Staff Authentication */}
-        <Route path="/login" element={<PublicLayout />}>
-          <Route index element={<LoginPage />} />
-        </Route>
+        {/* Login page — full-screen dark, only minimal wrapper */}
+        <Route path="/login" element={<LoginPage />} />
 
         {/* Protected Staff Control Routes */}
         <Route
@@ -47,7 +45,7 @@ export function App() {
           <Route path="analytics" element={<AnalyticsDashboard />} />
         </Route>
 
-        {/* Catch-all Fallback */}
+        {/* Catch-all */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </HashRouter>

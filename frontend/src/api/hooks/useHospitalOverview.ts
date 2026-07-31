@@ -3,7 +3,7 @@ import { fetchOverviewSummary } from '../endpoints';
 import type { OverviewSummary } from '../types';
 
 /** Stale-while-revalidate polling key */
-export const OVERVIEW_QUERY_KEY = ['overview', 'summary'] as const;
+export const OVERVIEW_QUERY_KEY = ['hospital-overview'] as const;
 
 /**
  * Fetches aggregated hospital metrics (beds, staff, inventory, risk).

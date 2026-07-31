@@ -34,7 +34,7 @@ export const UserManagementPanel: React.FC = () => {
     }
   };
 
-  const pending = users.filter((u) => u.status === 'pending');
+  const pending = users.filter((u) => u.status === 'pending_approval');
   const active = users.filter((u) => u.status === 'active');
 
   if (loading) return <div className="p-4 text-sm text-slate-500 animate-pulse">Loading users...</div>;

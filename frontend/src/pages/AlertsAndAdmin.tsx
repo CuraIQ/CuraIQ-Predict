@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchAllUsers, approveUser, deleteUser, type User } from '../api/authApi';
+import { fetchAllUsers, approveUser, deleteUser } from '../api/authApi';
 import { useAuth } from '../contexts/AuthContext';
 import {
   AlertTriangle, Info, ShieldAlert, UserCheck, UserX, Trash2,

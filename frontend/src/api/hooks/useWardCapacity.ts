@@ -2,7 +2,7 @@ import { useQuery, UseQueryOptions } from '@tanstack/react-query';
 import { fetchWardCapacity } from '../endpoints';
 import type { WardCapacityOut } from '../types';
 
-export const WARD_CAPACITY_QUERY_KEY = ['wards', 'capacity'] as const;
+export const WARD_CAPACITY_QUERY_KEY = ['ward-capacity'] as const;
 
 /**
  * Fetches live + 24h forecasted ward occupancy.

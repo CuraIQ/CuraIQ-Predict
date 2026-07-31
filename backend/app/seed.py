@@ -53,7 +53,6 @@ def seed_database():
     db.add_all(predictions)
 
     db.commit()
-    db.close()
 
     # Generate credentials.txt
     cred_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "credentials.txt")
@@ -65,3 +64,5 @@ def seed_database():
             f.write(f"Email: {u.email}\\n")
             f.write(f"Password: {u.password}\\n")
             f.write("-" * 30 + "\\n")
+            
+    db.close()
