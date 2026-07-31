@@ -1,63 +1,47 @@
-import React, { useState, useEffect } from 'react';
-import { useOutletContext } from 'react-router-dom';
-import { API_BASE_URL } from '../config';
+import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useHospitalStore } from '../store/useHospitalStore';
-import { Sliders, Activity, CheckCircle2, RefreshCw, Zap, ShieldAlert, Sparkles } from 'lucide-react';
-import { UserManagementPanel } from '../components/admin/UserManagementPanel';
+import { triggerSurge } from '../api/endpoints';
+import { LayoutDashboard, Activity, CheckCircle2, Zap, ShieldAlert, Sparkles, Zap as SurgeIcon } from 'lucide-react';
+import { useWardCapacity } from '../api/hooks/useWardCapacity';
+import { useHospitalOverview } from '../api/hooks/useHospitalOverview';
+import { useActivePredictions } from '../api/hooks/useActivePredictions';
+import { useExecuteRecommendation } from '../api/hooks/useExecuteRecommendation';
 
 export const StaffDashboard: React.FC = () => {
-  const { showBroadcastToast } = useOutletContext<{ showBroadcastToast: (title: string, message: string) => void }>() || {};
   const { user } = useAuth();
-
-  const [bedCount, setBedCount] = useState(75);
-  const [erQueueCount, setErQueueCount] = useState(14);
-  const [doctorAvailability, setDoctorAvailability] = useState(12);
-  const [isShiftDay, setIsShiftDay] = useState(true);
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [prediction, setPrediction] = useState<any>(null);
-
+  const [isSurging, setIsSurging] = useState(false);
+  const [surgeActive, setSurgeActive] = useState(false);
+  
   const addActionLog = useHospitalStore((state) => state.addActionLog);
+  const { data: overview } = useHospitalOverview();
+  const { data: wards } = useWardCapacity();
+  const { data: predictionsPage } = useActivePredictions();
+  const executeRec = useExecuteRecommendation();
+  
+  const predictions = predictionsPage?.data || [];
+  
+  const isAdmin = user?.role === 'admin';
+  const canEditWards = user?.role === 'nurse' || user?.role === 'doctor' || user?.role === 'admin';
 
-  // Debounced backend telemetry sync
-  useEffect(() => {
-    const updateBackend = async () => {
-      setIsUpdating(true);
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/v1/staff/update`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Bypass-Tunnel-Reminder': 'true',
-          },
-          body: JSON.stringify({
-            bed_count: bedCount,
-            er_queue_count: erQueueCount,
-            doctor_availability: doctorAvailability,
-          }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setPrediction(data);
-        }
-      } catch (err) {
-        console.error('Failed to update telemetry:', err);
-      } finally {
-        setIsUpdating(false);
-      }
-    };
-
-    const timeoutId = setTimeout(() => {
-      updateBackend();
-    }, 400);
-
-    return () => clearTimeout(timeoutId);
-  }, [bedCount, erQueueCount, doctorAvailability]);
-
-  // Quick actions trigger
-  const handleQuickAction = (actionName: string, detail: string) => {
-    if (actionName === 'Mark Bed Available') {
-      setBedCount((prev) => Math.max(0, prev - 5));
+  const handleSurge = async () => {
+    if (!confirm('Activate Hospital Emergency Surge Protocol? This will update all connected dashboards in real-time.')) return;
+    setIsSurging(true);
+    try {
+      await triggerSurge();
+      setSurgeActive(true);
+      addActionLog({
+        predictionId: `surge-${Date.now()}`,
+        action: 'override',
+        status: 'accepted',
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error('Surge trigger failed:', err);
+    } finally {
+      setIsSurging(false);
+    }
+  };
     } else if (actionName === 'Call Next Patient') {
       setErQueueCount((prev) => Math.max(0, prev - 1));
     } else if (actionName === 'Trigger Surge Alert') {

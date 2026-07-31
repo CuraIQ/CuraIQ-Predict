@@ -20,9 +20,14 @@ from app.schemas.common import HealthResponse
 from app.ws.alerts import alert_broadcaster_loop, websocket_alerts_endpoint
 
 
+from app.seed import seed_database
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize background tasks and cleanly shut them down."""
+    
+    # Initialize DB
+    seed_database()
 
     stop_event = asyncio.Event()
     broadcaster_task = asyncio.create_task(alert_broadcaster_loop(stop_event))

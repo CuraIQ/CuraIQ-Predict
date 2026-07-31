@@ -10,6 +10,8 @@ import { LoginPage } from './pages/LoginPage';
 import { StaffDashboard } from './pages/StaffDashboard';
 import { WardsIntelligence } from './pages/WardsIntelligence';
 import { AnalyticsDashboard } from './pages/AnalyticsDashboard';
+import { InventoryIntelligence } from './pages/InventoryIntelligence';
+import { AlertsAndAdmin } from './pages/AlertsAndAdmin';
 
 // Protection
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -40,6 +42,8 @@ export function App() {
           <Route index element={<Navigate to="/staff/dashboard" replace />} />
           <Route path="dashboard" element={<StaffDashboard />} />
           <Route path="wards" element={<WardsIntelligence />} />
+          <Route path="inventory" element={<InventoryIntelligence />} />
+          <Route path="alerts" element={<AlertsAndAdmin />} />
           <Route path="analytics" element={<AnalyticsDashboard />} />
         </Route>
 

@@ -1,198 +1,338 @@
 import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { requestAccount } from '../api/authApi';
-import { Shield, Lock, UserCheck, ArrowRight, UserPlus } from 'lucide-react';
+import {
+  Shield, Lock, UserCheck, ArrowRight, UserPlus, Activity,
+  Building2, FlaskConical, Stethoscope, ChevronRight, Cross
+} from 'lucide-react';
+
+const DEMO_CREDENTIALS = [
+  { role: 'Admin', email: 'admin@curaiq.com', password: 'password123', icon: Shield, color: 'from-violet-500 to-purple-600', dept: 'Administration' },
+  { role: 'ER Doctor', email: 'er_doc@curaiq.com', password: 'password123', icon: Stethoscope, color: 'from-red-500 to-rose-600', dept: 'Emergency' },
+  { role: 'ER Nurse', email: 'er_nurse@curaiq.com', password: 'password123', icon: Activity, color: 'from-amber-500 to-orange-500', dept: 'Emergency' },
+  { role: 'Ward Nurse', email: 'ward_nurse@curaiq.com', password: 'password123', icon: Building2, color: 'from-sky-500 to-blue-600', dept: 'General Ward' },
+  { role: 'Pharmacist', email: 'pharmacy@curaiq.com', password: 'password123', icon: FlaskConical, color: 'from-emerald-500 to-teal-600', dept: 'Pharmacy' },
+];
 
 export const LoginPage: React.FC = () => {
-  const [mode, setMode] = useState<'login' | 'request'>('login');
-  
-  // Login State
+  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [regSuccess, setRegSuccess] = useState(false);
 
-  // Request Access State
-  const [reqName, setReqName] = useState('');
-  const [reqEmail, setReqEmail] = useState('');
-  const [reqPassword, setReqPassword] = useState('');
-  const [reqRole, setReqRole] = useState<'doctor' | 'nurse' | 'admin'>('doctor');
-  const [reqSuccess, setReqSuccess] = useState(false);
+  // Register fields
+  const [regName, setRegName] = useState('');
+  const [regEmpId, setRegEmpId] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regRole, setRegRole] = useState('nurse');
+  const [regDept, setRegDept] = useState('');
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const { login } = useAuth();
+  const { login, register } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
 
-  const from = (location.state as any)?.from?.pathname || '/staff/dashboard';
+  const handleQuickFill = (cred: (typeof DEMO_CREDENTIALS)[0]) => {
+    setEmail(cred.email);
+    setPassword(cred.password);
+    setMode('login');
+    setError('');
+  };
 
-  const handleLoginSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    setErrorMsg('');
+    setIsLoading(true);
+    setError('');
     try {
       await login(email, password);
-      navigate(from, { replace: true });
+      navigate('/staff/dashboard', { replace: true });
     } catch (err: any) {
-      setErrorMsg(err.message || 'Login failed');
+      setError(err.message || 'Invalid credentials. Please try again.');
     } finally {
-      setIsSubmitting(false);
+      setIsLoading(false);
     }
   };
 
-  const handleRequestSubmit = async (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    setErrorMsg('');
+    setIsLoading(true);
+    setError('');
     try {
-      await requestAccount(reqName, reqEmail, reqPassword, reqRole);
-      setReqSuccess(true);
-      setMode('login');
+      await register(regName, regEmpId, regEmail, regRole, regDept);
+      setRegSuccess(true);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to request account');
+      setError(err.message || 'Registration failed. Please try again.');
     } finally {
-      setIsSubmitting(false);
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-6">
-        {/* Header Branding */}
-        <div className="text-center">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-600 to-sky-800 flex items-center justify-center text-white mx-auto shadow-lg shadow-sky-600/30">
-            <Shield className="w-6 h-6" />
+    <div className="min-h-screen bg-slate-950 flex">
+      {/* ── Left Panel ─────────────────────────────────────────────── */}
+      <div className="hidden lg:flex lg:w-1/2 xl:w-3/5 flex-col justify-between bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 border-r border-slate-800 p-12">
+        <div>
+          <div className="flex items-center gap-3 mb-16">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-lg shadow-blue-600/30">
+              <Cross className="w-5 h-5 text-white fill-current" />
+            </div>
+            <div>
+              <p className="text-white font-extrabold text-lg leading-none font-outfit">PredictIQ</p>
+              <p className="text-blue-400 text-xs font-mono">by CuraIQ • Hospital Intelligence</p>
+            </div>
           </div>
-          <h2 className="mt-4 text-2xl font-extrabold text-slate-900 font-outfit">Clinical Staff Portal</h2>
-          <p className="mt-1 text-xs text-slate-500">Authorized medical personnel & administrator access</p>
+
+          <h1 className="text-4xl xl:text-5xl font-extrabold text-white leading-tight mb-4">
+            Hospital Operations
+            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">
+              Intelligence Portal
+            </span>
+          </h1>
+          <p className="text-slate-400 text-lg mb-12 leading-relaxed max-w-md">
+            AI-powered real-time visibility into every department, bed, and resource across
+            St. Jude Regional Medical Center.
+          </p>
+
+          <div className="space-y-2 mb-10">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">
+              Demo Accounts — Click to autofill
+            </p>
+            {DEMO_CREDENTIALS.map((cred) => {
+              const Icon = cred.icon;
+              return (
+                <button
+                  key={cred.email}
+                  onClick={() => handleQuickFill(cred)}
+                  className="w-full flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-800/60 border border-slate-700/50 hover:border-slate-600 hover:bg-slate-800 transition-all group text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${cred.color} flex items-center justify-center`}>
+                      <Icon className="w-4 h-4 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-white">{cred.role}</p>
+                      <p className="text-xs text-slate-400 font-mono">{cred.email}</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all" />
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        {reqSuccess && (
-          <div className="bg-emerald-50 text-emerald-700 p-4 rounded-xl text-sm text-center border border-emerald-100">
-            Account request submitted! An admin will review your access soon.
-          </div>
-        )}
+        <div className="grid grid-cols-3 gap-4">
+          {[
+            { val: '24/7', label: 'Live Monitoring' },
+            { val: '5', label: 'Role Modules' },
+            { val: 'AI', label: 'Risk Prediction' },
+          ].map((item) => (
+            <div key={item.label} className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 text-center">
+              <p className="text-2xl font-extrabold text-blue-400">{item.val}</p>
+              <p className="text-xs text-slate-500 mt-1">{item.label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
 
-        {/* Card Container */}
-        <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-xl border border-slate-200/80">
-          
-          {/* Toggle Mode */}
-          <div className="flex rounded-lg bg-slate-100 p-1 mb-6 text-sm font-medium">
+      {/* ── Right Panel ─────────────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col items-center justify-center p-8 bg-slate-950">
+        <div className="w-full max-w-md">
+          {/* Mobile logo */}
+          <div className="flex lg:hidden items-center gap-2 mb-8 justify-center">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center">
+              <Cross className="w-4 h-4 text-white fill-current" />
+            </div>
+            <span className="font-extrabold text-white text-lg font-outfit">PredictIQ</span>
+          </div>
+
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold text-white">Staff Portal Access</h2>
+            <p className="text-slate-400 text-sm mt-1">Authorized medical personnel only</p>
+          </div>
+
+          {/* Mode Toggle */}
+          <div className="flex bg-slate-900 rounded-xl p-1 mb-8 border border-slate-800">
             <button
-              onClick={() => setMode('login')}
-              className={`flex-1 py-2 rounded-md transition-colors ${mode === 'login' ? 'bg-white shadow text-sky-700' : 'text-slate-500 hover:text-slate-700'}`}
+              id="tab-login"
+              onClick={() => { setMode('login'); setError(''); setRegSuccess(false); }}
+              className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                mode === 'login'
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
+                  : 'text-slate-400 hover:text-white'
+              }`}
             >
               Sign In
             </button>
             <button
-              onClick={() => setMode('request')}
-              className={`flex-1 py-2 rounded-md transition-colors ${mode === 'request' ? 'bg-white shadow text-sky-700' : 'text-slate-500 hover:text-slate-700'}`}
+              id="tab-register"
+              onClick={() => { setMode('register'); setError(''); }}
+              className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                mode === 'register'
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
+                  : 'text-slate-400 hover:text-white'
+              }`}
             >
               Request Access
             </button>
           </div>
 
-          {errorMsg && (
-            <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-600 text-sm text-center border border-red-100">
-              {errorMsg}
+          {error && (
+            <div className="mb-4 p-3 rounded-xl bg-red-950/50 border border-red-800/50 text-red-300 text-sm text-center">
+              {error}
             </div>
           )}
 
-          {mode === 'login' ? (
-            <form onSubmit={handleLoginSubmit} className="space-y-4">
+          {regSuccess ? (
+            <div className="p-6 rounded-2xl bg-emerald-950/50 border border-emerald-700/50 text-center">
+              <div className="w-12 h-12 bg-emerald-900/60 rounded-full flex items-center justify-center mx-auto mb-3">
+                <UserCheck className="w-6 h-6 text-emerald-400" />
+              </div>
+              <h3 className="text-emerald-300 font-bold mb-2">Request Submitted!</h3>
+              <p className="text-slate-400 text-sm">
+                A Hospital Administrator will review your account request and activate your access.
+              </p>
+              <button
+                onClick={() => { setMode('login'); setRegSuccess(false); }}
+                className="mt-4 text-blue-400 text-sm hover:underline"
+              >
+                Back to Sign In
+              </button>
+            </div>
+          ) : mode === 'login' ? (
+            <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Email</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-2">Staff Email</label>
                 <div className="relative">
-                  <UserCheck className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  <UserCheck className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
                   <input
+                    id="login-email"
                     type="email"
                     required
-                    placeholder="doctor@curaiq.io"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition-all"
+                    placeholder="staff@curaiq.com"
+                    className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm transition-all"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Password</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-2">Password</label>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
                   <input
+                    id="login-password"
                     type="password"
                     required
-                    placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition-all"
+                    placeholder="••••••••"
+                    className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm transition-all"
                   />
                 </div>
               </div>
-
               <button
+                id="login-submit"
                 type="submit"
-                disabled={isSubmitting}
-                className="w-full mt-4 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold text-white bg-slate-900 hover:bg-slate-800 disabled:opacity-70 transition-colors shadow-md"
+                disabled={isLoading}
+                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-60 transition-all shadow-lg shadow-blue-600/30 mt-2"
               >
-                {isSubmitting ? 'Authenticating...' : 'Sign In'}
-                {!isSubmitting && <ArrowRight className="w-4 h-4" />}
+                {isLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Authenticating...
+                  </>
+                ) : (
+                  <>
+                    Sign In to Portal <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
               </button>
             </form>
           ) : (
-            <form onSubmit={handleRequestSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Full Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="John Doe"
-                  value={reqName}
-                  onChange={(e) => setReqName(e.target.value)}
-                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none transition-all"
-                />
+            <form onSubmit={handleRegister} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-2">Full Name</label>
+                  <input
+                    id="reg-name"
+                    type="text"
+                    required
+                    value={regName}
+                    onChange={(e) => setRegName(e.target.value)}
+                    placeholder="Dr. Jane Smith"
+                    className="w-full px-3 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:border-blue-500 outline-none text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-2">Employee ID</label>
+                  <input
+                    id="reg-empid"
+                    type="text"
+                    required
+                    value={regEmpId}
+                    onChange={(e) => setRegEmpId(e.target.value)}
+                    placeholder="EMP-001"
+                    className="w-full px-3 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:border-blue-500 outline-none text-sm"
+                  />
+                </div>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Email</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-2">Email Address</label>
                 <input
+                  id="reg-email"
                   type="email"
                   required
-                  placeholder="john.doe@curaiq.io"
-                  value={reqEmail}
-                  onChange={(e) => setReqEmail(e.target.value)}
-                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none transition-all"
+                  value={regEmail}
+                  onChange={(e) => setRegEmail(e.target.value)}
+                  placeholder="jane.smith@curaiq.com"
+                  className="w-full px-3 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:border-blue-500 outline-none text-sm"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Role Needed</label>
-                <select
-                  value={reqRole}
-                  onChange={(e) => setReqRole(e.target.value as any)}
-                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none transition-all"
-                >
-                  <option value="doctor">Doctor</option>
-                  <option value="nurse">Nurse</option>
-                  <option value="admin">Administrator</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Desired Password</label>
-                <input
-                  type="password"
-                  required
-                  placeholder="••••••••"
-                  value={reqPassword}
-                  onChange={(e) => setReqPassword(e.target.value)}
-                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none transition-all"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-2">Role</label>
+                  <select
+                    id="reg-role"
+                    value={regRole}
+                    onChange={(e) => setRegRole(e.target.value)}
+                    className="w-full px-3 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white focus:border-blue-500 outline-none text-sm"
+                  >
+                    <option value="nurse">Ward Nurse</option>
+                    <option value="doctor">ER Doctor</option>
+                    <option value="pharmacist">Pharmacist</option>
+                    <option value="admin">Administrator</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-2">Department</label>
+                  <input
+                    id="reg-dept"
+                    type="text"
+                    required
+                    value={regDept}
+                    onChange={(e) => setRegDept(e.target.value)}
+                    placeholder="Emergency"
+                    className="w-full px-3 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:border-blue-500 outline-none text-sm"
+                  />
+                </div>
               </div>
               <button
+                id="register-submit"
                 type="submit"
-                disabled={isSubmitting}
-                className="w-full mt-4 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold text-white bg-sky-600 hover:bg-sky-700 disabled:opacity-70 transition-colors shadow-md"
+                disabled={isLoading}
+                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-60 transition-all shadow-lg shadow-blue-600/30"
               >
-                {isSubmitting ? 'Submitting...' : 'Submit Request'}
-                {!isSubmitting && <UserPlus className="w-4 h-4" />}
+                {isLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Submitting...
+                  </>
+                ) : (
+                  <>
+                    Submit Access Request <UserPlus className="w-4 h-4" />
+                  </>
+                )}
               </button>
             </form>
           )}

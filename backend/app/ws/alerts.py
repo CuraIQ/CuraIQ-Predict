@@ -6,11 +6,11 @@ from datetime import datetime, timezone
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-from app.in_memory_db import db
+from app.database import SessionLocal
+from app.models import Prediction
 from app.api.v1.endpoints.predictions import _risk_level
 
 logger = logging.getLogger("predictiq.ws.alerts")
-
 
 class AlertConnectionManager:
     """Tracks active WebSocket clients and broadcasts alert payloads."""
@@ -38,31 +38,35 @@ class AlertConnectionManager:
         for connection in stale:
             self.disconnect(connection)
 
-
 alert_manager = AlertConnectionManager()
 
+async def broadcast_alert(payload: dict) -> None:
+    """Helper to broadcast custom messages across the app."""
+    await alert_manager.broadcast(payload)
 
-def _prediction_to_ws_payload(prediction: dict) -> dict:
+def _prediction_to_ws_payload(prediction: Prediction) -> dict:
     return {
-        "id": prediction["id"],
-        "prediction_type": prediction["prediction_type"],
-        "risk_score": prediction["risk_score"],
-        "risk_level": _risk_level(prediction["risk_score"]),
-        "forecasted_event": prediction["forecasted_event"],
-        "target_timestamp": prediction.get("target_timestamp"),
-        "recommended_action": prediction["recommended_action"],
-        "ward_id": prediction.get("target_ward_id"),
+        "id": prediction.id,
+        "prediction_type": prediction.prediction_type,
+        "risk_score": prediction.risk_score,
+        "risk_level": _risk_level(prediction.risk_score),
+        "forecasted_event": prediction.forecasted_event,
+        "target_timestamp": prediction.target_timestamp.isoformat() if prediction.target_timestamp else None,
+        "recommended_action": prediction.recommended_action,
+        "ward_id": prediction.target_ward_id,
     }
 
-
-def _fetch_high_risk_predictions() -> list[dict]:
+def _fetch_high_risk_predictions() -> list[Prediction]:
     """Return active predictions with risk_score >= 0.7, sorted descending."""
-    active = [
-        p for p in db["predictions"]
-        if p["status"] == "active" and p["risk_score"] >= 0.7
-    ]
-    active.sort(key=lambda p: p["risk_score"], reverse=True)
-    return active[:5]
+    db = SessionLocal()
+    try:
+        active = db.query(Prediction).filter(
+            Prediction.status == "active",
+            Prediction.risk_score >= 0.7
+        ).order_by(Prediction.risk_score.desc()).limit(5).all()
+        return active
+    finally:
+        db.close()
 
 
 async def alert_broadcaster_loop(stop_event: asyncio.Event, interval_seconds: float = 20.0) -> None:

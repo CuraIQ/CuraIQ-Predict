@@ -1,10 +1,12 @@
 from datetime import datetime, timezone
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session
 
+from app.database import get_db
+from app.models import Prediction
 from app.dependencies import PaginationParams
 from app.exceptions import NotFoundException, ConflictException
-from app.in_memory_db import db
 from app.schemas.common import PaginatedResponse, PaginationMeta, EnvelopeResponse
 from app.schemas.prediction import (
     PredictionOut,
@@ -34,37 +36,38 @@ async def list_active_predictions(
     risk_level: str | None = Query(None, description="Filter: critical, high, medium, low"),
     prediction_type: str | None = Query(None, description="Filter by prediction_type enum value"),
     ward_id: UUID | None = Query(None, description="Filter by ward UUID"),
+    db: Session = Depends(get_db)
 ):
-    active_preds = [p for p in db["predictions"] if p["status"] == "active"]
+    query = db.query(Prediction).filter(Prediction.status == "active")
 
     if risk_level and risk_level in _RISK_RANGES:
         lo, hi = _RISK_RANGES[risk_level]
-        active_preds = [p for p in active_preds if lo <= p["risk_score"] < hi]
+        query = query.filter(Prediction.risk_score >= lo, Prediction.risk_score < hi)
     if prediction_type:
-        active_preds = [p for p in active_preds if p["prediction_type"] == prediction_type]
+        query = query.filter(Prediction.prediction_type == prediction_type)
     if ward_id:
-        active_preds = [p for p in active_preds if p.get("ward_id") == str(ward_id)]
+        query = query.filter(Prediction.target_ward_id == str(ward_id))
 
-    active_preds.sort(key=lambda p: (p["risk_score"], p["created_at"]), reverse=True)
-
-    total = len(active_preds)
+    query = query.order_by(Prediction.risk_score.desc(), Prediction.created_at.desc())
+    
+    total = query.count()
     start = pagination.offset
     end = start + pagination.page_size
-    page_items = active_preds[start:end]
+    page_items = query.offset(start).limit(pagination.page_size).all()
 
     items = [
         PredictionOut(
-            id=UUID(p["id"]),
-            prediction_type=p["prediction_type"],
-            ward_id=UUID(p["ward_id"]) if p.get("ward_id") else None,
-            item_id=UUID(p["item_id"]) if p.get("item_id") else None,
-            risk_score=p["risk_score"],
-            risk_level=_risk_level(p["risk_score"]),
-            forecasted_event=p["forecasted_event"],
-            target_timestamp=datetime.fromisoformat(p["target_timestamp"]) if p.get("target_timestamp") else None,
-            recommended_action=p["recommended_action"],
-            status=p["status"],
-            created_at=datetime.fromisoformat(p["created_at"]),
+            id=UUID(p.id),
+            prediction_type=p.prediction_type,
+            ward_id=UUID(p.target_ward_id) if p.target_ward_id else None,
+            item_id=UUID(p.target_item_id) if p.target_item_id else None,
+            risk_score=p.risk_score,
+            risk_level=_risk_level(p.risk_score),
+            forecasted_event=p.forecasted_event,
+            target_timestamp=p.target_timestamp,
+            recommended_action=p.recommended_action,
+            status=p.status,
+            created_at=p.created_at,
         )
         for p in page_items
     ]
@@ -84,14 +87,15 @@ async def list_active_predictions(
 async def act_on_prediction(
     prediction_id: UUID,
     body: PredictionActionRequest,
+    db: Session = Depends(get_db)
 ):
-    pred = next((p for p in db["predictions"] if p["id"] == str(prediction_id)), None)
+    pred = db.query(Prediction).filter(Prediction.id == str(prediction_id)).first()
     if not pred:
         raise NotFoundException(detail=f"Prediction {prediction_id} not found")
 
-    if pred["status"] != "active":
+    if pred.status != "active":
         raise ConflictException(
-            detail=f"Prediction is already '{pred['status']}' and cannot be actioned",
+            detail=f"Prediction is already '{pred.status}' and cannot be actioned",
             error_code="PREDICTION_NOT_ACTIONABLE",
         )
 
@@ -100,15 +104,17 @@ async def act_on_prediction(
         PredictionAction.DISMISS: "dismissed",
         PredictionAction.OVERRIDE: "overridden",
     }
-    pred["status"] = status_map[body.action]
-    pred["action_notes"] = body.notes
-    pred["actioned_at"] = datetime.now(timezone.utc).isoformat()
+    pred.status = status_map[body.action]
+    actioned_at = datetime.now(timezone.utc)
+    
+    db.commit()
+    db.refresh(pred)
 
     return EnvelopeResponse(
         data=PredictionActionResponse(
-            id=UUID(pred["id"]),
-            status=pred["status"],
-            action_notes=pred["action_notes"],
-            actioned_at=datetime.fromisoformat(pred["actioned_at"]),
+            id=UUID(pred.id),
+            status=pred.status,
+            action_notes=body.notes,
+            actioned_at=actioned_at,
         )
     )
