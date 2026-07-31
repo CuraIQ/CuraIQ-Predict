@@ -1,0 +1,12 @@
+CuraIQ Predict - Staff Accounts
+===============================
+
+Hospital Admin Account
+Email: admin@curaiq.io
+Password: adminpassword123
+Role: Hospital Admin
+
+Doctor / Nurse Account
+Email: doctor@curaiq.io
+Password: doctorpassword123
+Role: Doctor / Nurse

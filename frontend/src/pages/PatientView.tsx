@@ -1,48 +1,34 @@
-import React, { useState, useEffect } from 'react';
-import { API_BASE_URL } from '../config';
+import React, { useState } from 'react';
+import { useWardCapacity } from '../api/hooks/useWardCapacity';
 import { WaitTimeHero } from '../components/patient/WaitTimeHero';
 import { TriageBadge } from '../components/patient/TriageBadge';
 import { WardOccupancyCard } from '../components/patient/WardOccupancyCard';
 import { CheckInModal } from '../components/patient/CheckInModal';
 import { ShieldCheck, UserPlus, Info } from 'lucide-react';
 
-interface LiveStatus {
-  wait_time_mins: number;
-  ai_status_message: string;
-  bed_occupancy_rate: number;
-}
-
 export const PatientView: React.FC = () => {
-  const [status, setStatus] = useState<LiveStatus | null>(null);
   const [isCheckInOpen, setIsCheckInOpen] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState<string>('Just now');
-
-  useEffect(() => {
-    const fetchStatus = async () => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/v1/customer/live-status`, {
-          headers: {
-            'Bypass-Tunnel-Reminder': 'true',
-          },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setStatus(data);
-          setLastUpdated(new Date().toLocaleTimeString());
-        }
-      } catch (err) {
-        console.error('Failed to fetch live status:', err);
-      }
-    };
-
-    fetchStatus();
-    const interval = setInterval(fetchStatus, 3000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const waitTime = status?.wait_time_mins ?? 42;
-  const occupancy = status?.bed_occupancy_rate ?? 78;
-  const aiMsg = status?.ai_status_message ?? 'Triage workload optimal. Standard priority queuing active.';
+  const { data: wards, isSuccess } = useWardCapacity();
+  
+  // Calculate aggregate occupancy
+  let totalBeds = 0;
+  let occupiedBeds = 0;
+  if (wards) {
+    wards.forEach(w => {
+      totalBeds += w.capacity;
+      occupiedBeds += w.occupied_beds;
+    });
+  }
+  
+  const occupancy = totalBeds > 0 ? Math.round((occupiedBeds / totalBeds) * 100) : 78;
+  const waitTime = occupancy > 90 ? 85 : occupancy > 80 ? 45 : 25;
+  const aiMsg = occupancy > 90 
+    ? 'Critical Capacity - High Wait Times for Non-Emergencies' 
+    : occupancy > 80 
+    ? 'High Volume - Expect Moderate Wait Times' 
+    : 'Triage workload optimal. Standard priority queuing active.';
+  
+  const lastUpdated = isSuccess ? new Date().toLocaleTimeString() : 'Just now';
 
   // Triage Workload category
   const workload: 'Normal' | 'High Volume' | 'Critical Capacity' =
@@ -86,30 +72,17 @@ export const PatientView: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <WardOccupancyCard
-            wardName="Emergency Department"
-            type="er"
-            occupied={Math.round(50 * (occupancy / 100))}
-            total={50}
-          />
-          <WardOccupancyCard
-            wardName="Intensive Care Unit (ICU)"
-            type="icu"
-            occupied={44}
-            total={50}
-          />
-          <WardOccupancyCard
-            wardName="General Medical Ward"
-            type="general"
-            occupied={218}
-            total={250}
-          />
-          <WardOccupancyCard
-            wardName="Surgical Recovery"
-            type="surgery"
-            occupied={88}
-            total={100}
-          />
+          {wards ? wards.slice(0, 4).map(w => (
+            <WardOccupancyCard
+              key={w.id}
+              wardName={w.ward_name}
+              type={w.ward_type as any}
+              occupied={w.occupied_beds}
+              total={w.capacity}
+            />
+          )) : (
+            <div className="col-span-4 text-center py-8 text-slate-500">Loading live capacity...</div>
+          )}
         </div>
       </div>
 

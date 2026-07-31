@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { executeRecommendation } from '../endpoints';
-import { isUsingMockData } from '../mockData';
 import { PREDICTIONS_QUERY_KEY } from './useActivePredictions';
 import { OVERVIEW_QUERY_KEY } from './useHospitalOverview';
 import type {
@@ -31,14 +30,6 @@ export function useExecuteRecommendation() {
 
   return useMutation<PredictionActionResponse, Error, MutationVariables, MutationContext>({
     mutationFn: ({ predictionId, payload }) => {
-      if (isUsingMockData()) {
-        return Promise.resolve({
-          id: predictionId,
-          status: payload.action === 'accept' ? 'accepted' : payload.action === 'dismiss' ? 'dismissed' : 'overridden',
-          action_notes: payload.notes ?? null,
-          actioned_at: new Date().toISOString(),
-        } as PredictionActionResponse);
-      }
       return executeRecommendation(predictionId, payload);
     },
 

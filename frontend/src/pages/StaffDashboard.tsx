@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
+import { useAuth } from '../contexts/AuthContext';
 import { useHospitalStore } from '../store/useHospitalStore';
 import { Sliders, Activity, CheckCircle2, RefreshCw, Zap, ShieldAlert, Sparkles } from 'lucide-react';
+import { UserManagementPanel } from '../components/admin/UserManagementPanel';
 
 export const StaffDashboard: React.FC = () => {
   const { showBroadcastToast } = useOutletContext<{ showBroadcastToast: (title: string, message: string) => void }>() || {};
+  const { user } = useAuth();
 
   const [bedCount, setBedCount] = useState(75);
   const [erQueueCount, setErQueueCount] = useState(14);
@@ -116,6 +119,8 @@ export const StaffDashboard: React.FC = () => {
           )}
         </div>
       </div>
+
+      {user?.role === 'admin' && <UserManagementPanel />}
 
       {/* Quick Action Bar */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

@@ -1,40 +1,56 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Shield, Lock, UserCheck, Stethoscope, Building, Key, Sparkles, ArrowRight } from 'lucide-react';
+import { requestAccount } from '../api/authApi';
+import { Shield, Lock, UserCheck, ArrowRight, UserPlus } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
-  const [role, setRole] = useState<'doctor' | 'admin'>('doctor');
+  const [mode, setMode] = useState<'login' | 'request'>('login');
+  
+  // Login State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  // Request Access State
+  const [reqName, setReqName] = useState('');
+  const [reqEmail, setReqEmail] = useState('');
+  const [reqPassword, setReqPassword] = useState('');
+  const [reqRole, setReqRole] = useState<'doctor' | 'nurse' | 'admin'>('doctor');
+  const [reqSuccess, setReqSuccess] = useState(false);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { login, quickLogin } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   const from = (location.state as any)?.from?.pathname || '/staff/dashboard';
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setErrorMsg('');
     try {
-      await login(email, role);
+      await login(email, password);
       navigate(from, { replace: true });
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Login failed');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleQuickFill = async (preset: 'doctor' | 'admin') => {
+  const handleRequestSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setIsSubmitting(true);
+    setErrorMsg('');
     try {
-      await quickLogin(preset);
-      navigate(from, { replace: true });
-    } catch (err) {
-      console.error(err);
+      await requestAccount(reqName, reqEmail, reqPassword, reqRole);
+      setReqSuccess(true);
+      setMode('login');
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to request account');
     } finally {
       setIsSubmitting(false);
     }
@@ -52,116 +68,134 @@ export const LoginPage: React.FC = () => {
           <p className="mt-1 text-xs text-slate-500">Authorized medical personnel & administrator access</p>
         </div>
 
+        {reqSuccess && (
+          <div className="bg-emerald-50 text-emerald-700 p-4 rounded-xl text-sm text-center border border-emerald-100">
+            Account request submitted! An admin will review your access soon.
+          </div>
+        )}
+
         {/* Card Container */}
         <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-xl border border-slate-200/80">
-          {/* Role Selection Tabs */}
-          <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl mb-6 text-xs font-semibold">
+          
+          {/* Toggle Mode */}
+          <div className="flex rounded-lg bg-slate-100 p-1 mb-6 text-sm font-medium">
             <button
-              type="button"
-              onClick={() => setRole('doctor')}
-              className={`py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-all ${
-                role === 'doctor'
-                  ? 'bg-white text-sky-700 shadow-2xs font-bold'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
+              onClick={() => setMode('login')}
+              className={`flex-1 py-2 rounded-md transition-colors ${mode === 'login' ? 'bg-white shadow text-sky-700' : 'text-slate-500 hover:text-slate-700'}`}
             >
-              <Stethoscope className="w-4 h-4" />
-              <span>Doctor / Nurse</span>
+              Sign In
             </button>
             <button
-              type="button"
-              onClick={() => setRole('admin')}
-              className={`py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-all ${
-                role === 'admin'
-                  ? 'bg-white text-sky-700 shadow-2xs font-bold'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
+              onClick={() => setMode('request')}
+              className={`flex-1 py-2 rounded-md transition-colors ${mode === 'request' ? 'bg-white shadow text-sky-700' : 'text-slate-500 hover:text-slate-700'}`}
             >
-              <Building className="w-4 h-4" />
-              <span>Hospital Admin</span>
+              Request Access
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Staff ID / Email</label>
-              <div className="relative">
-                <UserCheck className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+          {errorMsg && (
+            <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-600 text-sm text-center border border-red-100">
+              {errorMsg}
+            </div>
+          )}
+
+          {mode === 'login' ? (
+            <form onSubmit={handleLoginSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Email</label>
+                <div className="relative">
+                  <UserCheck className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  <input
+                    type="email"
+                    required
+                    placeholder="doctor@curaiq.io"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition-all"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Password</label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  <input
+                    type="password"
+                    required
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition-all"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full mt-4 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold text-white bg-slate-900 hover:bg-slate-800 disabled:opacity-70 transition-colors shadow-md"
+              >
+                {isSubmitting ? 'Authenticating...' : 'Sign In'}
+                {!isSubmitting && <ArrowRight className="w-4 h-4" />}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleRequestSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Full Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="John Doe"
+                  value={reqName}
+                  onChange={(e) => setReqName(e.target.value)}
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Email</label>
                 <input
                   type="email"
                   required
-                  placeholder={role === 'doctor' ? 'doctor@curaiq.io' : 'admin@curaiq.io'}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none"
+                  placeholder="john.doe@curaiq.io"
+                  value={reqEmail}
+                  onChange={(e) => setReqEmail(e.target.value)}
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none transition-all"
                 />
               </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Passcode / Password</label>
-              <div className="relative">
-                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Role Needed</label>
+                <select
+                  value={reqRole}
+                  onChange={(e) => setReqRole(e.target.value as any)}
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none transition-all"
+                >
+                  <option value="doctor">Doctor</option>
+                  <option value="nurse">Nurse</option>
+                  <option value="admin">Administrator</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Desired Password</label>
                 <input
                   type="password"
                   required
                   placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none"
+                  value={reqPassword}
+                  onChange={(e) => setReqPassword(e.target.value)}
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none transition-all"
                 />
               </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full py-3 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 shadow-md transition-all flex items-center justify-center gap-2"
-            >
-              {isSubmitting ? (
-                <span>Authenticating Session...</span>
-              ) : (
-                <>
-                  <span>Sign In to Staff Panel</span>
-                  <ArrowRight className="w-4 h-4 text-sky-400" />
-                </>
-              )}
-            </button>
-          </form>
-
-          {/* Quick Fill Demo Credentials Buttons */}
-          <div className="mt-6 pt-6 border-t border-slate-100">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              <span>Demo Quick-Access Fill</span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <button
-                type="button"
-                onClick={() => handleQuickFill('doctor')}
-                className="py-2 px-3 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 text-xs font-medium flex items-center justify-between transition-colors"
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full mt-4 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold text-white bg-sky-600 hover:bg-sky-700 disabled:opacity-70 transition-colors shadow-md"
               >
-                <div className="text-left">
-                  <div className="font-bold">Duty Doctor</div>
-                  <div className="text-[10px] text-sky-600 font-mono">doctor@curaiq.io</div>
-                </div>
-                <Key className="w-3.5 h-3.5 text-sky-500" />
+                {isSubmitting ? 'Submitting...' : 'Submit Request'}
+                {!isSubmitting && <UserPlus className="w-4 h-4" />}
               </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickFill('admin')}
-                className="py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 text-xs font-medium flex items-center justify-between transition-colors"
-              >
-                <div className="text-left">
-                  <div className="font-bold">Hospital Admin</div>
-                  <div className="text-[10px] text-slate-600 font-mono">admin@curaiq.io</div>
-                </div>
-                <Key className="w-3.5 h-3.5 text-slate-500" />
-              </button>
-            </div>
-          </div>
+            </form>
+          )}
         </div>
       </div>
     </div>

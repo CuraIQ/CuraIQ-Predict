@@ -3,7 +3,10 @@ import {
   withMockFallback,
   MOCK_OVERVIEW,
   MOCK_PREDICTIONS_PAGE,
-  MOCK_WARD_CAPACITY,
+  getMockWardCapacity,
+  getMockPredictions,
+  setMockPredictions,
+  setMockWardCapacity
 } from './mockData';
 import type {
   EnvelopeResponse,
@@ -23,7 +26,7 @@ export async function fetchOverviewSummary(): Promise<OverviewSummary> {
   return withMockFallback(async () => {
     const { data } = await apiClient.get<EnvelopeResponse<OverviewSummary>>('/overview/summary');
     return data.data;
-  }, MOCK_OVERVIEW);
+  }, () => MOCK_OVERVIEW);
 }
 
 // ── Predictions ──────────────────────────────────────────────────────
@@ -42,18 +45,40 @@ export async function fetchActivePredictions(
       `/predictions/active?${params.toString()}`,
     );
     return data;
-  }, MOCK_PREDICTIONS_PAGE);
+  }, () => MOCK_PREDICTIONS_PAGE());
 }
 
 export async function executeRecommendation(
   predictionId: string,
   payload: PredictionActionRequest,
 ): Promise<PredictionActionResponse> {
-  const { data } = await apiClient.post<EnvelopeResponse<PredictionActionResponse>>(
-    `/predictions/${predictionId}/action`,
-    payload,
-  );
-  return data.data;
+  try {
+    const { data } = await apiClient.post<EnvelopeResponse<PredictionActionResponse>>(
+      `/predictions/${predictionId}/action`,
+      payload,
+    );
+    return data.data;
+  } catch (err) {
+    // Mock Execution
+    console.warn('[PredictIQ] Backend unreachable — executing action in mock mode.', err);
+    let preds = getMockPredictions();
+    preds = preds.filter(p => p.id !== predictionId);
+    setMockPredictions(preds);
+    
+    // Also simulate ward update on action
+    let wards = getMockWardCapacity();
+    if (payload.action === 'accept') {
+      wards = wards.map(w => ({ ...w, occupied_beds: Math.max(0, w.occupied_beds - 5), occupancy_rate: Math.max(0, w.occupied_beds - 5) / w.capacity * 100 }));
+      setMockWardCapacity(wards);
+    }
+    
+    return {
+      id: predictionId,
+      status: 'resolved',
+      action_notes: payload.notes || null,
+      actioned_at: new Date().toISOString()
+    };
+  }
 }
 
 // ── Wards ────────────────────────────────────────────────────────────
@@ -61,7 +86,7 @@ export async function fetchWardCapacity(): Promise<WardCapacityOut[]> {
   return withMockFallback(async () => {
     const { data } = await apiClient.get<EnvelopeResponse<WardCapacityOut[]>>('/wards/capacity');
     return data.data;
-  }, MOCK_WARD_CAPACITY);
+  }, () => getMockWardCapacity());
 }
 
 // ── Telemetry ────────────────────────────────────────────────────────

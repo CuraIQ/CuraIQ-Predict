@@ -42,7 +42,7 @@ export const MOCK_OVERVIEW: OverviewSummary = {
   generated_at: NOW,
 };
 
-export const MOCK_PREDICTIONS: PredictionOut[] = [
+const INITIAL_PREDICTIONS: PredictionOut[] = [
   {
     id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0001',
     prediction_type: 'bed_overflow',
@@ -110,12 +110,7 @@ export const MOCK_PREDICTIONS: PredictionOut[] = [
   },
 ];
 
-export const MOCK_PREDICTIONS_PAGE: PaginatedResponse<PredictionOut> = {
-  data: MOCK_PREDICTIONS,
-  meta: { page: 1, page_size: 20, total: MOCK_PREDICTIONS.length, total_pages: 1 },
-};
-
-export const MOCK_WARD_CAPACITY: WardCapacityOut[] = [
+const INITIAL_WARD_CAPACITY: WardCapacityOut[] = [
   {
     id: '22222222-2222-2222-2222-222222222201',
     ward_name: 'Intensive Care Unit',
@@ -188,6 +183,37 @@ export const MOCK_WARD_CAPACITY: WardCapacityOut[] = [
   },
 ];
 
+// LocalStorage DB for Mocks
+export function getMockPredictions(): PredictionOut[] {
+  const data = localStorage.getItem('curaiq_mock_predictions');
+  if (data) return JSON.parse(data);
+  localStorage.setItem('curaiq_mock_predictions', JSON.stringify(INITIAL_PREDICTIONS));
+  return INITIAL_PREDICTIONS;
+}
+
+export function setMockPredictions(predictions: PredictionOut[]) {
+  localStorage.setItem('curaiq_mock_predictions', JSON.stringify(predictions));
+}
+
+export function getMockWardCapacity(): WardCapacityOut[] {
+  const data = localStorage.getItem('curaiq_mock_wards');
+  if (data) return JSON.parse(data);
+  localStorage.setItem('curaiq_mock_wards', JSON.stringify(INITIAL_WARD_CAPACITY));
+  return INITIAL_WARD_CAPACITY;
+}
+
+export function setMockWardCapacity(wards: WardCapacityOut[]) {
+  localStorage.setItem('curaiq_mock_wards', JSON.stringify(wards));
+}
+
+export const MOCK_PREDICTIONS_PAGE = (): PaginatedResponse<PredictionOut> => {
+  const data = getMockPredictions();
+  return {
+    data,
+    meta: { page: 1, page_size: 20, total: data.length, total_pages: 1 },
+  };
+};
+
 /** Tracks whether the app is currently serving mock data. */
 let usingMockData = false;
 
@@ -201,7 +227,7 @@ export function setUsingMockData(value: boolean): void {
 
 export async function withMockFallback<T>(
   fetcher: () => Promise<T>,
-  fallback: T,
+  fallback: () => T,
 ): Promise<T> {
   try {
     const result = await fetcher();
@@ -210,6 +236,6 @@ export async function withMockFallback<T>(
   } catch (err) {
     console.warn('[PredictIQ] Backend unreachable — using mock data.', err);
     setUsingMockData(true);
-    return fallback;
+    return fallback();
   }
 }
