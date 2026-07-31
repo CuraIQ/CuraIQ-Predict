@@ -1,0 +1,18 @@
+fastapi>=0.111.0
+uvicorn[standard]>=0.30.0
+sqlalchemy[asyncio]>=2.0.30
+asyncpg>=0.29.0
+pydantic>=2.7.0
+pydantic-settings>=2.3.0
+alembic>=1.13.0
+httpx>=0.27.0
+python-dotenv>=1.0.0
+
+# ML / data pipeline (generate_telemetry.py & predict_iq_pipeline.py)
+pandas>=2.2.0
+numpy>=1.26.0
+scikit-learn>=1.5.0
+xgboost>=2.1.0
+lightgbm>=4.5.0
+joblib>=1.4.0
+Faker>=30.0.0
